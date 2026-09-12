@@ -1,0 +1,7 @@
+{
+  "_comment": "Thresholds for the shape checker. Edit and restart Claude Code; the injected directive quotes these numbers, so a change reaches the model and the linter together.",
+  "paragraphWords": 70,
+  "sentenceWords": 35,
+  "blockLines": 6,
+  "maxReported": 4
+}

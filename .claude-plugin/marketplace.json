@@ -1,0 +1,15 @@
+{
+  "name": "readable-responses",
+  "owner": {
+    "name": "NovusEdge",
+    "url": "https://github.com/NovusEdge"
+  },
+  "plugins": [
+    {
+      "name": "readable-responses",
+      "source": "./",
+      "description": "Makes Claude Code write readable replies. Reports paragraph, sentence, and block-length violations by quoting the offending text.",
+      "keywords": ["writing", "readability", "prose", "linting", "shape", "hooks"]
+    }
+  ]
+}
