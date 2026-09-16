@@ -8,7 +8,7 @@
     {
       "name": "readable-responses",
       "source": "./",
-      "description": "Makes Claude Code write readable replies. Reports paragraph, sentence, and block-length violations by quoting the offending text.",
+      "description": "Makes Claude Code and Codex CLI write readable replies. Reports paragraph, sentence, list-item, block-length, buried-lead, and prose-table violations by quoting the offending text.",
       "keywords": ["writing", "readability", "prose", "linting", "shape", "hooks"]
     }
   ]
