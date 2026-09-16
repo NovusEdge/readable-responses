@@ -1,13 +1,12 @@
 {
   "name": "readable-responses",
   "displayName": "Readable Responses",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Makes Claude Code and Codex CLI write readable replies. Reads the previous turn and reports wall-of-text, long-sentence, long-list-item, unbroken-block, buried-lead, and prose-table violations by quoting the offending text.",
   "author": {
     "name": "NovusEdge"
   },
   "license": "MIT",
   "homepage": "https://github.com/NovusEdge/readable-responses",
-  "keywords": ["writing", "readability", "prose", "linting", "shape", "hooks"],
-  "hooks": "./hooks/hooks.json"
+  "keywords": ["writing", "readability", "prose", "linting", "shape", "hooks"]
 }
