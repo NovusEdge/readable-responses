@@ -29,7 +29,21 @@ function report(transcriptPath) {
   ];
 }
 
-function main(input) {
+// Claude Code injects the raw stdout of the hook. Codex reads a JSON envelope
+// and injects hookSpecificOutput.additionalContext. The caller passes --codex
+// because the two hosts send overlapping stdin fields, so sniffing the payload
+// would guess.
+function envelope(text, codex) {
+  if (!codex) return text;
+  return JSON.stringify({
+    hookSpecificOutput: {
+      hookEventName: 'UserPromptSubmit',
+      additionalContext: text,
+    },
+  });
+}
+
+function main(input, codex = false) {
   let payload = {};
   try {
     payload = JSON.parse(input || '{}');
@@ -37,17 +51,18 @@ function main(input) {
     payload = {};
   }
   const out = [DIRECTIVE, ...report(payload.transcript_path)];
-  process.stdout.write(out.join('\n') + '\n');
+  process.stdout.write(envelope(out.join('\n'), codex) + '\n');
 }
 
 if (require.main === module) {
+  const codex = process.argv.includes('--codex');
   let stdin = '';
   process.stdin.setEncoding('utf8');
   process.stdin.on('data', chunk => {
     stdin += chunk;
   });
-  process.stdin.on('end', () => main(stdin));
-  process.stdin.on('error', () => main(''));
+  process.stdin.on('end', () => main(stdin, codex));
+  process.stdin.on('error', () => main('', codex));
 }
 
-module.exports = { main, report };
+module.exports = { main, report, envelope };

@@ -1,5 +1,5 @@
 {
-  "_comment": "Thresholds for the shape checker. Edit and restart Claude Code; the injected directive quotes these numbers, so a change reaches the model and the linter together.",
+  "_comment": "Default thresholds. Override them in .readable-responses.json in the project, or ~/.claude/readable-responses.json; this file belongs to the installed plugin and an update overwrites it. The injected directive quotes the resolved numbers, so a change reaches the model and the linter together.",
   "paragraphWords": 70,
   "sentenceWords": 35,
   "blockLines": 6,

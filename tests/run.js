@@ -14,15 +14,48 @@ const path = require('path');
 const HOOK = path.join(__dirname, '..', 'hooks', 'inject.js');
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'readable-responses-test-'));
 const EMPTY_HOME = fs.mkdtempSync(path.join(os.tmpdir(), 'readable-responses-home-'));
+const REAL_HOME = process.env.HOME;
+
+// The in-process require of check.js below resolves config the same way the
+// subprocess does, so both must see the same empty HOME and project directory.
+process.env.HOME = EMPTY_HOME;
+process.env.CLAUDE_PROJECT_DIR = EMPTY_HOME;
+process.env.CODEX_HOME = EMPTY_HOME;
 
 let failures = 0;
 
-function run(stdin, { home = EMPTY_HOME } = {}) {
-  return execFileSync('node', [HOOK], {
+function run(stdin, { home = EMPTY_HOME, projectDir = EMPTY_HOME, args = [] } = {}) {
+  return execFileSync('node', [HOOK, ...args], {
     input: stdin,
     encoding: 'utf8',
-    env: { ...process.env, HOME: home },
+    env: { ...process.env, HOME: home, CLAUDE_PROJECT_DIR: projectDir },
   });
+}
+
+function codexInstall(codexHome) {
+  return execFileSync('python3', [path.join(__dirname, '..', 'install.py'), '--codex'], {
+    encoding: 'utf8',
+    env: { ...process.env, CODEX_HOME: codexHome },
+  });
+}
+
+// A config source the hook should find. Returns the directory to point at.
+function configDir(name, { userConfig, projectConfig } = {}) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), `readable-responses-${name}-`));
+  if (userConfig) {
+    fs.mkdirSync(path.join(dir, '.claude'), { recursive: true });
+    fs.writeFileSync(
+      path.join(dir, '.claude', 'readable-responses.json'),
+      JSON.stringify(userConfig)
+    );
+  }
+  if (projectConfig) {
+    fs.writeFileSync(
+      path.join(dir, '.readable-responses.json'),
+      JSON.stringify(projectConfig)
+    );
+  }
+  return dir;
 }
 
 function transcript(name, entries) {
@@ -34,6 +67,22 @@ function transcript(name, entries) {
 const turn = (prompt, reply) => [
   { type: 'user', message: { role: 'user', content: prompt } },
   { type: 'assistant', message: { role: 'assistant', content: [{ type: 'text', text: reply }] } },
+];
+
+// A Codex rollout file. The message sits under payload, the assistant block is
+// output_text, and tool traffic shares the response_item type.
+const codexTurn = (prompt, reply) => [
+  { type: 'session_meta', payload: { id: 'session' } },
+  {
+    type: 'response_item',
+    payload: { type: 'message', role: 'user', content: [{ type: 'input_text', text: prompt }] },
+  },
+  { type: 'response_item', payload: { type: 'reasoning', summary: [] } },
+  { type: 'response_item', payload: { type: 'function_call', name: 'shell', arguments: '{}' } },
+  {
+    type: 'response_item',
+    payload: { type: 'message', role: 'assistant', content: [{ type: 'output_text', text: reply }] },
+  },
 ];
 
 function assert(name, condition, detail) {
@@ -124,13 +173,170 @@ console.log('readable-responses');
 }
 
 {
+  const reply = 'Let me walk through the build. It runs on every branch.';
+  const file = transcript('lead', turn('why is the bill high', reply));
+  const out = run(JSON.stringify({ transcript_path: file }));
+  assert('preamble opener reports buried lead', out.includes('buried lead'), out);
+}
+
+{
+  const file = transcript('answerfirst', turn('why is the bill high', CLEAN));
+  const out = run(JSON.stringify({ transcript_path: file }));
+  assert('answer-first opener is not a buried lead', !out.includes('buried lead'), out);
+}
+
+{
+  const reply = [
+    'Build: runs on every push to every branch.',
+    'Registry: fills with images nobody pulls.',
+    'Storage: grows until the quarter closes.',
+  ].join('\n');
+  const file = transcript('prosetable', turn('compare these', reply));
+  const out = run(JSON.stringify({ transcript_path: file }));
+  assert('three labelled prose lines report prose table', out.includes('prose table'), out);
+}
+
+{
+  const reply = ['Build: runs on every push.', 'Registry: fills up.'].join('\n');
+  const file = transcript('twolabels', turn('compare these', reply));
+  const out = run(JSON.stringify({ transcript_path: file }));
+  assert('two labelled lines are not a prose table', !out.includes('prose table'), out);
+}
+
+{
+  const reply = '- ' + WALL;
+  const file = transcript('longbullet', turn('explain', reply));
+  const out = run(JSON.stringify({ transcript_path: file }));
+  assert('an overlong bullet reports long list item', out.includes('long list item'), out);
+}
+
+// The splitter used to cut this in two at "e.g. The", and neither half passed
+// the sentence limit, so the violation went unreported.
+{
+  const reply = [
+    'The cache layer should sit in front of the primary database for every read path',
+    'that tolerates staleness, e.g. The dashboard counters, the leaderboard, and the',
+    'search suggestions, all of which refresh on a timer anyway today.',
+  ].join(' ');
+  const file = transcript('abbrev', turn('explain', reply));
+  const out = run(JSON.stringify({ transcript_path: file }));
+  assert('an abbreviation does not end a sentence', out.includes('long sentence'), out);
+}
+
+{
+  const home = configDir('userhome', { userConfig: { paragraphWords: 12 } });
+  const file = transcript('userlimit', turn('why is the bill high', CLEAN));
+  const out = run(JSON.stringify({ transcript_path: file }), { home });
+  assert('user config lowers the paragraph limit', out.includes('over 12'), out);
+  assert('directive quotes the user config', out.includes('under 12 words'), out);
+  fs.rmSync(home, { recursive: true, force: true });
+}
+
+{
+  const home = configDir('bothhome', { userConfig: { paragraphWords: 12 } });
+  const project = configDir('bothproject', { projectConfig: { paragraphWords: 9 } });
+  const file = transcript('projectlimit', turn('why is the bill high', CLEAN));
+  const out = run(JSON.stringify({ transcript_path: file }), { home, projectDir: project });
+  assert('project config beats user config', out.includes('under 9 words'), out);
+  fs.rmSync(home, { recursive: true, force: true });
+  fs.rmSync(project, { recursive: true, force: true });
+}
+
+{
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'readable-responses-badcfg-'));
+  fs.mkdirSync(path.join(home, '.claude'), { recursive: true });
+  fs.writeFileSync(path.join(home, '.claude', 'readable-responses.json'), '{ broken');
+  const out = run(JSON.stringify({ session_id: 'abc' }), { home });
+  assert('malformed config falls back to the defaults', out.includes('under 70 words'), out);
+  fs.rmSync(home, { recursive: true, force: true });
+}
+
+{
+  const file = transcript('codex', codexTurn('why is the bill high', WALL));
+  const out = run(JSON.stringify({ transcript_path: file }));
+  assert('codex rollout reaches the same finding', out.includes('wall of text'), out);
+  assert('codex tool traffic is skipped', out.includes('The deployment pipeline currently'), out);
+}
+
+{
+  const file = transcript('codexclean', codexTurn('why is the bill high', CLEAN));
+  const out = run(JSON.stringify({ transcript_path: file }));
+  assert('codex clean turn reports nothing', !out.includes('READABILITY VIOLATED'), out);
+}
+
+{
+  const file = transcript('codexjson', codexTurn('why is the bill high', WALL));
+  const out = run(JSON.stringify({ transcript_path: file }), { args: ['--codex'] });
+  let parsed = null;
+  try {
+    parsed = JSON.parse(out);
+  } catch {
+    parsed = null;
+  }
+  assert('--codex emits JSON', parsed !== null, out);
+  const specific = (parsed && parsed.hookSpecificOutput) || {};
+  assert('--codex names the event', specific.hookEventName === 'UserPromptSubmit', out);
+  assert(
+    '--codex carries the report as additionalContext',
+    typeof specific.additionalContext === 'string' && specific.additionalContext.includes('wall of text'),
+    out
+  );
+}
+
+{
+  const codexHome = fs.mkdtempSync(path.join(os.tmpdir(), 'readable-responses-codexhome-'));
+  const existing = {
+    hooks: {
+      Stop: [{ hooks: [{ type: 'command', command: 'true', timeout: 30 }] }],
+    },
+  };
+  fs.writeFileSync(path.join(codexHome, 'hooks.json'), JSON.stringify(existing));
+  codexInstall(codexHome);
+  const merged = JSON.parse(fs.readFileSync(path.join(codexHome, 'hooks.json'), 'utf8'));
+  assert('codex install keeps existing hooks', Array.isArray(merged.hooks.Stop), JSON.stringify(merged));
+  const entries = merged.hooks.UserPromptSubmit || [];
+  const commands = JSON.stringify(entries);
+  assert('codex install registers UserPromptSubmit', entries.length === 1, commands);
+  assert('codex install passes --codex', commands.includes('--codex'), commands);
+  assert(
+    'codex install copies the hook next to the config',
+    fs.existsSync(path.join(codexHome, 'readable-responses', 'hooks', 'inject.js')),
+    commands
+  );
+
+  codexInstall(codexHome);
+  const again = JSON.parse(fs.readFileSync(path.join(codexHome, 'hooks.json'), 'utf8'));
+  assert(
+    'a second install does not duplicate the entry',
+    again.hooks.UserPromptSubmit.length === 1,
+    JSON.stringify(again.hooks.UserPromptSubmit)
+  );
+  fs.rmSync(codexHome, { recursive: true, force: true });
+}
+
+{
+  const codexHome = fs.mkdtempSync(path.join(os.tmpdir(), 'readable-responses-codexcfg-'));
+  fs.writeFileSync(
+    path.join(codexHome, 'readable-responses.json'),
+    JSON.stringify({ sentenceWords: 8 })
+  );
+  const out = execFileSync('node', [HOOK], {
+    input: JSON.stringify({ session_id: 'abc' }),
+    encoding: 'utf8',
+    env: { ...process.env, HOME: EMPTY_HOME, CLAUDE_PROJECT_DIR: EMPTY_HOME, CODEX_HOME: codexHome },
+  });
+  assert('CODEX_HOME config is read', out.includes('under 8 words'), out);
+  fs.rmSync(codexHome, { recursive: true, force: true });
+}
+
+{
   const curtCheck = path.join(
-    process.env.HOME || '',
+    REAL_HOME || '',
     '.claude/plugins/marketplaces/curt/hooks/check.js'
   );
   if (fs.existsSync(curtCheck)) {
     const file = transcript('curt', turn('why is the bill high', WALL));
-    const out = run(JSON.stringify({ transcript_path: file }), { home: process.env.HOME });
+    const out = run(JSON.stringify({ transcript_path: file }), { home: REAL_HOME });
     assert('curt transcript reader reaches the same finding', out.includes('wall of text'), out);
   } else {
     console.log('  skip curt transcript reader (curt not installed)');
