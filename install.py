@@ -3,7 +3,7 @@
 
     ./install.py              register the marketplace from GitHub (Claude Code)
     ./install.py --local      register it from this checkout instead
-    ./install.py --codex      copy the hook under CODEX_HOME and register it
+    ./install.py --codex      install the hook and bundled skill under CODEX_HOME
 """
 
 import argparse
@@ -28,18 +28,14 @@ def install_codex() -> int:
         print("Error: 'node' is not on PATH.", file=sys.stderr)
         return 1
     source = HERE / "hooks"
-    if not source.is_dir():
-        print(f"Error: no hooks directory next to {__file__}.", file=sys.stderr)
+    skill_source = HERE / "skills" / "de-slopify"
+    if not source.is_dir() or not (skill_source / "SKILL.md").is_file():
+        print(f"Error: hook or skill files are missing next to {__file__}.", file=sys.stderr)
         print(f"Clone the repository first: git clone https://github.com/{REPO}", file=sys.stderr)
         return 1
 
     home = codex_home()
     target = home / "readable-responses"
-    shutil.rmtree(target, ignore_errors=True)
-    target.mkdir(parents=True)
-    shutil.copytree(source, target / "hooks")
-    shutil.copy2(HERE / "limits.json", target / "limits.json")
-
     config_path = home / "hooks.json"
     config = {}
     if config_path.exists():
@@ -49,6 +45,23 @@ def install_codex() -> int:
             # Overwriting a hand-edited config would cost the user their other hooks.
             print(f"Error: {config_path} is not valid JSON. Fix it and run this again.", file=sys.stderr)
             return 1
+
+    shutil.rmtree(target, ignore_errors=True)
+    target.mkdir(parents=True)
+    shutil.copytree(source, target / "hooks")
+    shutil.copy2(HERE / "limits.json", target / "limits.json")
+    bundled_skill = target / "skills" / "de-slopify"
+    shutil.copytree(skill_source, bundled_skill)
+    skill_link = home / "skills" / "de-slopify"
+    shared_skill = Path.home() / ".agents" / "skills" / "de-slopify"
+    if skill_link.is_symlink() and skill_link.resolve() == bundled_skill.resolve():
+        print(f"Updated bundled de-slopify at {skill_link}.")
+    elif skill_link.exists() or skill_link.is_symlink() or shared_skill.exists():
+        print(f"Kept existing de-slopify skill; bundled copy is at {bundled_skill}.")
+    else:
+        skill_link.parent.mkdir(parents=True, exist_ok=True)
+        skill_link.symlink_to(bundled_skill, target_is_directory=True)
+        print(f"Installed de-slopify at {skill_link}.")
 
     hook = target / "hooks" / "inject.js"
     entry = {
@@ -73,7 +86,8 @@ def install_codex() -> int:
     print(f"Installed to {target} and registered in {config_path}.")
     print()
     print("Restart Codex. Remove the UserPromptSubmit entry from that file to turn it off.")
-    print("Tune the thresholds in ~/.codex/readable-responses.json.")
+    print(f"Tune review thresholds in {home / 'readable-responses.json'}.")
+    print("Use $de-slopify to review or edit prose.")
     return 0
 
 
@@ -103,6 +117,7 @@ def install_claude(local: bool) -> int:
     print("Installed. Restart Claude Code.")
     print()
     print("  /plugin disable readable-responses    turn the hook off")
+    print("  /readable-responses:de-slopify        review or edit prose")
     print()
     print("Tune the thresholds in ~/.claude/readable-responses.json, or per project")
     print("in .readable-responses.json at the repository root.")

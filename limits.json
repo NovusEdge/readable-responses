@@ -1,5 +1,5 @@
 {
-  "_comment": "Default thresholds. Override them in .readable-responses.json in the project, or ~/.claude/readable-responses.json; this file belongs to the installed plugin and an update overwrites it. The injected directive quotes the resolved numbers, so a change reaches the model and the linter together.",
+  "_comment": "Review thresholds, not mandatory output limits. Override them in .readable-responses.json in the project, ~/.claude/readable-responses.json, or CODEX_HOME/readable-responses.json. Installed plugin updates replace this file; the injected guidance quotes the resolved numbers.",
   "paragraphWords": 70,
   "sentenceWords": 35,
   "blockLines": 6,

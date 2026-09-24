@@ -1,0 +1,4 @@
+interface:
+  display_name: "De-slopify"
+  short_description: "Edit formulaic prose while preserving meaning and voice"
+  default_prompt: "Use $de-slopify to edit this text for clarity while preserving its meaning, useful detail, and author's voice."

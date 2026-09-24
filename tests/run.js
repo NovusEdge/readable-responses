@@ -124,14 +124,18 @@ console.log('readable-responses');
   assert('violating paragraph reports wall of text', out.includes('wall of text'), out);
   assert('report quotes the offending text', out.includes('The deployment pipeline currently'), out);
   assert('report names the limit', /over 70/.test(out), out);
-  assert('directive is always present', out.startsWith('READABLE RESPONSE RULES.'), out);
+  assert('guidance is always present', out.startsWith('READABLE RESPONSE GUIDANCE.'), out);
+  assert('findings are advisory', out.includes('READABILITY REVIEW'), out);
+  assert('findings do not command a rewrite', !/VIOLATED|Rewrite that shape in every reply/.test(out), out);
+  assert('length signals are not output limits', out.includes('not output limits'), out);
+  assert('the requested format takes precedence', out.includes("user's requested format"), out);
 }
 
 {
   const file = transcript('clean', turn('why is the bill high', CLEAN));
   const out = run(JSON.stringify({ transcript_path: file }));
-  assert('clean message reports nothing', !out.includes('READABILITY VIOLATED'), out);
-  assert('clean message still gets the directive', out.includes('READABLE RESPONSE RULES.'), out);
+  assert('clean message reports nothing', !out.includes('READABILITY REVIEW'), out);
+  assert('clean message still gets the guidance', out.includes('READABLE RESPONSE GUIDANCE.'), out);
 }
 
 {
@@ -156,7 +160,7 @@ console.log('readable-responses');
 {
   const file = transcript('fenced', turn('show me the code', FENCED));
   const out = run(JSON.stringify({ transcript_path: file }));
-  assert('code fences produce no violations', !out.includes('READABILITY VIOLATED'), out);
+  assert('code fences produce no findings', !out.includes('READABILITY REVIEW'), out);
 }
 
 {
@@ -228,7 +232,7 @@ console.log('readable-responses');
   const file = transcript('userlimit', turn('why is the bill high', CLEAN));
   const out = run(JSON.stringify({ transcript_path: file }), { home });
   assert('user config lowers the paragraph limit', out.includes('over 12'), out);
-  assert('directive quotes the user config', out.includes('under 12 words'), out);
+  assert('guidance quotes the user config', out.includes('paragraphs over 12 words'), out);
   fs.rmSync(home, { recursive: true, force: true });
 }
 
@@ -237,7 +241,7 @@ console.log('readable-responses');
   const project = configDir('bothproject', { projectConfig: { paragraphWords: 9 } });
   const file = transcript('projectlimit', turn('why is the bill high', CLEAN));
   const out = run(JSON.stringify({ transcript_path: file }), { home, projectDir: project });
-  assert('project config beats user config', out.includes('under 9 words'), out);
+  assert('project config beats user config', out.includes('paragraphs over 9 words'), out);
   fs.rmSync(home, { recursive: true, force: true });
   fs.rmSync(project, { recursive: true, force: true });
 }
@@ -247,7 +251,7 @@ console.log('readable-responses');
   fs.mkdirSync(path.join(home, '.claude'), { recursive: true });
   fs.writeFileSync(path.join(home, '.claude', 'readable-responses.json'), '{ broken');
   const out = run(JSON.stringify({ session_id: 'abc' }), { home });
-  assert('malformed config falls back to the defaults', out.includes('under 70 words'), out);
+  assert('malformed config falls back to the defaults', out.includes('paragraphs over 70 words'), out);
   fs.rmSync(home, { recursive: true, force: true });
 }
 
@@ -261,7 +265,7 @@ console.log('readable-responses');
 {
   const file = transcript('codexclean', codexTurn('why is the bill high', CLEAN));
   const out = run(JSON.stringify({ transcript_path: file }));
-  assert('codex clean turn reports nothing', !out.includes('READABILITY VIOLATED'), out);
+  assert('codex clean turn reports nothing', !out.includes('READABILITY REVIEW'), out);
 }
 
 {
@@ -303,7 +307,13 @@ console.log('readable-responses');
     fs.existsSync(path.join(codexHome, 'readable-responses', 'hooks', 'inject.js')),
     commands
   );
+  const skill = path.join(codexHome, 'skills', 'de-slopify');
+  assert('codex install exposes the bundled skill', fs.existsSync(path.join(skill, 'SKILL.md')));
+  assert('codex install includes skill references', fs.existsSync(path.join(skill, 'references', 'review-checklist.md')));
 
+  if (fs.existsSync(path.join(skill, 'SKILL.md'))) {
+    fs.writeFileSync(path.join(skill, 'SKILL.md'), 'Old bundled version.');
+  }
   codexInstall(codexHome);
   const again = JSON.parse(fs.readFileSync(path.join(codexHome, 'hooks.json'), 'utf8'));
   assert(
@@ -311,6 +321,44 @@ console.log('readable-responses');
     again.hooks.UserPromptSubmit.length === 1,
     JSON.stringify(again.hooks.UserPromptSubmit)
   );
+  assert('a second install refreshes the managed skill', fs.existsSync(path.join(skill, 'SKILL.md')) && fs.readFileSync(path.join(skill, 'SKILL.md'), 'utf8').includes('name: de-slopify'));
+  fs.rmSync(codexHome, { recursive: true, force: true });
+}
+
+{
+  const codexHome = fs.mkdtempSync(path.join(os.tmpdir(), 'readable-responses-shared-skill-'));
+  const shared = path.join(EMPTY_HOME, '.agents', 'skills', 'de-slopify');
+  fs.mkdirSync(shared, { recursive: true });
+  fs.writeFileSync(path.join(shared, 'SKILL.md'), 'Shared personal skill.');
+  codexInstall(codexHome);
+  assert('a shared personal skill is preserved', fs.readFileSync(path.join(shared, 'SKILL.md'), 'utf8') === 'Shared personal skill.');
+  assert('a shared personal skill is not shadowed by a new Codex copy', !fs.existsSync(path.join(codexHome, 'skills', 'de-slopify')));
+  fs.rmSync(shared, { recursive: true, force: true });
+  fs.rmSync(codexHome, { recursive: true, force: true });
+}
+
+{
+  const codexHome = fs.mkdtempSync(path.join(os.tmpdir(), 'readable-responses-invalid-install-'));
+  const target = path.join(codexHome, 'readable-responses');
+  fs.mkdirSync(target);
+  fs.writeFileSync(path.join(target, 'keep.txt'), 'Existing installation.');
+  fs.writeFileSync(path.join(codexHome, 'hooks.json'), '{ malformed');
+  let rejected = false;
+  try { codexInstall(codexHome); } catch (error) { rejected = error.status === 1; }
+  assert('invalid hook config rejects installation', rejected);
+  assert('invalid hook config leaves installed files intact', fs.existsSync(path.join(target, 'keep.txt')));
+  assert('invalid hook config is not overwritten', fs.readFileSync(path.join(codexHome, 'hooks.json'), 'utf8') === '{ malformed');
+  fs.rmSync(codexHome, { recursive: true, force: true });
+}
+
+{
+  const codexHome = fs.mkdtempSync(path.join(os.tmpdir(), 'readable-responses-personal-skill-'));
+  const skill = path.join(codexHome, 'skills', 'de-slopify');
+  fs.mkdirSync(skill, { recursive: true });
+  fs.writeFileSync(path.join(skill, 'SKILL.md'), 'Personal skill, leave intact.');
+  const out = codexInstall(codexHome);
+  assert('codex install preserves an existing personal skill', fs.readFileSync(path.join(skill, 'SKILL.md'), 'utf8') === 'Personal skill, leave intact.');
+  assert('codex install explains the preserved skill', out.includes('existing de-slopify'), out);
   fs.rmSync(codexHome, { recursive: true, force: true });
 }
 
@@ -325,7 +373,7 @@ console.log('readable-responses');
     encoding: 'utf8',
     env: { ...process.env, HOME: EMPTY_HOME, CLAUDE_PROJECT_DIR: EMPTY_HOME, CODEX_HOME: codexHome },
   });
-  assert('CODEX_HOME config is read', out.includes('under 8 words'), out);
+  assert('CODEX_HOME config is read', out.includes('sentences over 8 words'), out);
   fs.rmSync(codexHome, { recursive: true, force: true });
 }
 

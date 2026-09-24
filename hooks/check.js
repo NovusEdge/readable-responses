@@ -38,15 +38,16 @@ function loadLimits() {
 
 const LIMITS = loadLimits();
 
-// The directive quotes the live numbers, so a tuned limits.json cannot leave the
-// model working to a threshold the checker no longer enforces.
+// The review signals use the same thresholds as the checker; they do not set
+// mandatory limits on the reply the user requested.
 const DIRECTIVE = [
-  'READABLE RESPONSE RULES. These apply to every reply this turn.',
-  '- Lead with the answer. The first sentence carries the finding.',
-  `- Keep a paragraph under ${LIMITS.paragraphWords} words. Break a longer one in two.`,
-  `- Keep a sentence under ${LIMITS.sentenceWords} words.`,
-  '- Compare three or more things in a table, never in prose.',
-  `- Break a block longer than ${LIMITS.blockLines} lines with a list, a table, or a blank line.`,
+  'READABLE RESPONSE GUIDANCE. Follow the user\'s requested format and level of detail.',
+  '- Lead with the answer when it is known. A progress update can state the next action; do not invent a finding.',
+  '- Write connected prose with concrete facts and enough explanation for this reader. Keep necessary conditions and uncertainty.',
+  '- Use lists for parallel items or steps, and tables when shared fields help a comparison. Neither is required by the number of items.',
+  '- When editing, preserve the author\'s meaning, examples, opinions, jokes, and rhythm. Do not manufacture a voice with slang or clipped fragments.',
+  '- Remove empty promotion, staged revelations, honesty narration, and repeated conclusions while keeping substantive corrections and evidence.',
+  `- Review signals: paragraphs over ${LIMITS.paragraphWords} words, sentences over ${LIMITS.sentenceWords} words, and blocks over ${LIMITS.blockLines} lines. These are prompts to inspect context, not output limits.`,
 ].join('\n');
 
 // curt already solves transcript parsing: one turn spans many assistant
@@ -212,7 +213,7 @@ function check(prose) {
   if (opening && PREAMBLE.test(sentencesOf(opening)[0])) {
     found.push({
       rule: 'buried lead',
-      detail: 'the first sentence states intent, not the finding',
+      detail: 'opens with an intent or setup phrase; check whether the task calls for it',
       text: clip(sentencesOf(opening)[0]),
     });
   }
@@ -243,7 +244,7 @@ function check(prose) {
     if (labelled.length >= 3) {
       found.push({
         rule: 'prose table',
-        detail: `${labelled.length} labelled lines in a row (use a table)`,
+        detail: `${labelled.length} labelled lines in a row (check whether a table would clarify them)`,
         text: clip(labelled[0]),
       });
     }
