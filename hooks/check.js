@@ -43,8 +43,8 @@ const LIMITS = loadLimits();
 const DIRECTIVE = [
   'READABLE RESPONSE GUIDANCE. Follow the user\'s requested format and level of detail.',
   '- Lead with the answer when it is known. A progress update can state the next action; do not invent a finding.',
-  '- Write connected prose with concrete facts and enough explanation for this reader. Keep necessary conditions and uncertainty.',
-  '- Use lists for parallel items or steps, and tables when shared fields help a comparison. Neither is required by the number of items.',
+  '- Give concrete facts and enough explanation for this reader. Keep necessary conditions and uncertainty.',
+  '- Short answers are connected prose. A reply past about 150 words, or any document, gets scannable structure: one idea per paragraph, headers for sections, lists for parallel items or steps, tables when shared fields help a comparison.',
   '- When editing, preserve the author\'s meaning, examples, opinions, jokes, and rhythm. Do not manufacture a voice with slang or clipped fragments.',
   '- Remove empty promotion, staged revelations, honesty narration, and repeated conclusions while keeping substantive corrections and evidence.',
   `- Review signals: paragraphs over ${LIMITS.paragraphWords} words, sentences over ${LIMITS.sentenceWords} words, and blocks over ${LIMITS.blockLines} lines. These are prompts to inspect context, not output limits.`,

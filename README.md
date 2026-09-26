@@ -60,7 +60,7 @@ The accompanying guidance asks the agent to inspect the passage in context and c
 
 ## Writing guidance and de-slopify
 
-Lead with the answer when it is known; a progress update can state the next action. Write connected prose with enough explanation for the reader. Use lists for parallel items or steps, and tables when shared fields help a comparison. Neither is required by the number of items.
+Lead with the answer when it is known; a progress update can state the next action. Short answers are connected prose. A reply past about 150 words, or any document, gets scannable structure: one idea per paragraph, headers for sections, lists for parallel items or steps, and tables when shared fields help a comparison.
 
 When editing, preserve facts, qualifications, examples, opinions, jokes, and rhythm. Remove empty promotion, staged revelations, honesty narration, and repeated conclusions while keeping real corrections and the evidence behind them. Do not invent experiences or stronger claims to make text sound more natural.
 
