@@ -19,7 +19,7 @@ Or from a checkout: `./install.py --local`.
 
 ### Codex CLI, as a plugin
 
-From the team marketplace:
+From the Nimble Fox team marketplace, which is private to the `nimble-fox-ai` organization:
 
 ```bash
 codex plugin marketplace add nimble-fox-ai/agent-plugins
