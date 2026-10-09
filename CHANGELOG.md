@@ -1,10 +1,10 @@
 # Changelog
 
-## Unreleased
+## [0.4.0] - 2026-10-09
 
 ### Added
 
-- Codex plugin manifest at `.codex-plugin/plugin.json`, sharing the skill and `hooks/hooks.json` with the Claude plugin. Installs with `codex plugin add`; `install.py --codex` stays as an alternative.
+- Codex plugin manifest at `.codex-plugin/plugin.json`, sharing the skill and `hooks/hooks.json` with the Claude plugin. Installs with `codex plugin add`; `install.py --codex` stays as an alternative, and using both runs the hook twice.
 - Description on the Claude marketplace manifest, so `claude plugin validate --strict` passes.
 
 ## [0.3.0] - 2026-09-24
