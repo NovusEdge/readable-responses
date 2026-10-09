@@ -1,0 +1,23 @@
+{
+  "name": "readable-responses",
+  "version": "0.3.0",
+  "description": "Contextual readability guidance for Claude Code and Codex CLI, with the de-slopify skill for editing prose while preserving meaning and author voice.",
+  "author": {
+    "name": "NovusEdge",
+    "url": "https://github.com/NovusEdge"
+  },
+  "homepage": "https://github.com/NovusEdge/readable-responses",
+  "repository": "https://github.com/NovusEdge/readable-responses",
+  "license": "MIT",
+  "keywords": ["writing", "readability", "prose", "linting", "shape", "hooks"],
+  "skills": "./skills/",
+  "hooks": "./hooks/hooks.json",
+  "interface": {
+    "displayName": "Readable Responses",
+    "shortDescription": "Readability review hook and the de-slopify editing skill",
+    "developerName": "NovusEdge",
+    "category": "Productivity",
+    "capabilities": ["Read"],
+    "defaultPrompt": ["Use $de-slopify to edit this text for clarity while preserving its meaning."]
+  }
+}
