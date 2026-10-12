@@ -466,6 +466,17 @@ console.log('readable-responses');
   fs.rmSync(dir, { recursive: true, force: true });
 }
 
+{
+  const read = (p) => JSON.parse(fs.readFileSync(path.join(__dirname, '..', p), 'utf8'));
+  const claude = read('.claude-plugin/plugin.json');
+  const codex = read('.codex-plugin/plugin.json');
+  assert('codex manifest has the claude manifest name and version', codex.name === claude.name && codex.version === claude.version, `${codex.name}@${codex.version} vs ${claude.name}@${claude.version}`);
+  assert('codex manifest points at the shared skills and hooks', codex.skills === './skills/' && codex.hooks === './hooks/hooks.json');
+  const hermes = fs.readFileSync(path.join(__dirname, '..', '.hermes-plugin', 'plugin.yaml'), 'utf8');
+  const hermesVersion = (hermes.match(/^version:\s*(\S+)/m) || [])[1];
+  assert('hermes manifest has the claude manifest version', hermesVersion === claude.version, `${hermesVersion} vs ${claude.version}`);
+}
+
 fs.rmSync(TMP, { recursive: true, force: true });
 fs.rmSync(EMPTY_HOME, { recursive: true, force: true });
 

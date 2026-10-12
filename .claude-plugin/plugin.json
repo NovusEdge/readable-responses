@@ -1,7 +1,7 @@
 {
   "name": "readable-responses",
   "displayName": "Readable Responses",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Contextual readability guidance for Claude Code and Codex CLI, with the de-slopify skill for editing prose while preserving meaning and author voice.",
   "author": {
     "name": "NovusEdge"

@@ -17,7 +17,38 @@ Restart Claude Code. Use `/readable-responses:de-slopify` to review or edit text
 
 Or from a checkout: `./install.py --local`.
 
-### Codex CLI
+### Codex CLI, as a plugin
+
+From the Nimble Fox team marketplace, which is private to the `nimble-fox-ai` organization:
+
+```bash
+codex plugin marketplace add nimble-fox-ai/agent-plugins
+codex plugin add readable-responses@nimble-fox
+```
+
+Or straight from this repository, whose `.codex-plugin/plugin.json` is the Codex manifest:
+
+```bash
+codex plugin marketplace add NovusEdge/readable-responses
+codex plugin add readable-responses@readable-responses
+```
+
+Codex does not trust a plugin's hooks on install. Review and trust the `UserPromptSubmit` hook with `/hooks` in the CLI, or Codex skips it. The skill is available at once as `$readable-responses:de-slopify`.
+
+What carries over:
+
+| Part | Claude Code | Codex plugin |
+|---|---|---|
+| `skills/de-slopify` | yes | yes, same files, no copy |
+| `hooks/hooks.json` | yes | yes, the same file; Codex sets `CLAUDE_PLUGIN_ROOT` for plugin hooks |
+| `hooks/inject.js` | raw stdout | raw stdout, which Codex adds as developer context |
+| agents, commands | none shipped | none shipped |
+
+The plugin and `./install.py --codex` do not combine. The plugin replaces the installer: with both, the hook runs twice and the skill appears twice. If you move to the plugin, remove the installer's `UserPromptSubmit` entry from `CODEX_HOME/hooks.json` and its `CODEX_HOME/skills/de-slopify` link. The installer stays for Codex setups that cannot use plugin marketplaces.
+
+The plugin reads limits from `CODEX_HOME/readable-responses.json` like the installer does. Codex's newer portable `plugin.json` (with `$schema`) is not used: codex-cli 0.153.4 loaded its skills but not its hooks.
+
+### Codex CLI, with the installer
 
 The installer copies the hook and bundled skill under `CODEX_HOME/readable-responses` and registers the hook:
 

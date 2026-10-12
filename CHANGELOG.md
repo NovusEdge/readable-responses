@@ -6,7 +6,14 @@
 
 - Hermes Agent plugin in `.hermes-plugin/`: per-prompt guidance and the previous-reply review through `pre_llm_call`.
 - `node hooks/check.js --json` for hosts that pass message text instead of a transcript.
-- `~/.hermes/readable-responses.json` as a limits source.
+- `$HERMES_HOME/readable-responses.json` (default `~/.hermes`) as a limits source.
+
+## [0.4.0] - 2026-10-09
+
+### Added
+
+- Codex plugin manifest at `.codex-plugin/plugin.json`, sharing the skill and `hooks/hooks.json` with the Claude plugin. Installs with `codex plugin add`; `install.py --codex` stays as an alternative, and using both runs the hook twice.
+- Description on the Claude marketplace manifest, so `claude plugin validate --strict` passes.
 
 ## [0.3.0] - 2026-09-24
 

@@ -4,6 +4,7 @@
     "name": "NovusEdge",
     "url": "https://github.com/NovusEdge"
   },
+  "description": "Readability guidance and the de-slopify editing skill.",
   "plugins": [
     {
       "name": "readable-responses",
