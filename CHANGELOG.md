@@ -1,5 +1,13 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- Hermes Agent plugin in `.hermes-plugin/`: per-prompt guidance and the previous-reply review through `pre_llm_call`.
+- `node hooks/check.js --json` for hosts that pass message text instead of a transcript.
+- `~/.hermes/readable-responses.json` as a limits source.
+
 ## [0.3.0] - 2026-09-24
 
 ### Changed

@@ -34,6 +34,14 @@ The installer preserves every other hook in that file. Running it twice replaces
 
 `install.py` needs Python 3 and the standard library only. The hook itself runs on Node.
 
+### Hermes Agent
+
+```bash
+hermes plugins install NovusEdge/readable-responses --enable
+```
+
+The plugin runs `hooks/check.js` with `node`, from `PATH` or the copy Hermes installs in `~/.hermes/node`. Restart open Hermes sessions after installing.
+
 ## What it does
 
 A `UserPromptSubmit` hook reads the transcript, takes the last assistant turn, and strips code and quotes from it. It then measures six things:
@@ -73,11 +81,12 @@ The bundled [de-slopify skill](skills/de-slopify/SKILL.md) adds guidance for tec
 | File | Scope |
 |------|-------|
 | `.readable-responses.json` in `CLAUDE_PROJECT_DIR`, or the current directory | this repository |
+| `~/.hermes/readable-responses.json` | Hermes user settings |
 | `~/.claude/readable-responses.json` | every project, Claude Code |
 | `CODEX_HOME/readable-responses.json` | Codex user settings |
 | `limits.json` in the plugin | the shipped defaults |
 
-The project file wins, followed by Claude user settings, Codex user settings, and the defaults. A file may set one key and inherit the rest:
+The project file wins, followed by Hermes user settings, Claude user settings, Codex user settings, and the defaults. A file may set one key and inherit the rest:
 
 ```json
 { "paragraphWords": 50 }
@@ -89,15 +98,16 @@ Editing `limits.json` in an installed plugin does not survive an update, because
 
 The injected guidance quotes the resolved numbers used by the checker. Changing a threshold changes when a passage is flagged; it does not set a mandatory length for future replies.
 
-## How the two hosts differ
+## How the hosts differ
 
 The checker is shared. Only the edges differ:
 
-| | Claude Code | Codex CLI |
-|---|---|---|
-| config | plugin `hooks.json` | `~/.codex/hooks.json` |
-| hook output | raw stdout | `hookSpecificOutput.additionalContext` JSON |
-| transcript entry | `message.content[].text` | `payload.content[].output_text` |
+| | Claude Code | Codex CLI | Hermes Agent |
+|---|---|---|---|
+| config | plugin `hooks.json` | `~/.codex/hooks.json` | `.hermes-plugin/plugin.yaml` |
+| hook | `UserPromptSubmit` | `UserPromptSubmit` | `pre_llm_call` |
+| hook output | raw stdout | `hookSpecificOutput.additionalContext` JSON | `{"context": …}` from Python |
+| previous reply | transcript `message.content[].text` | transcript `payload.content[].output_text` | `conversation_history`, passed to `check.js --json` |
 
 `hooks/inject.js` takes `--codex` to switch the output format. The flag is explicit because the two hosts send overlapping stdin fields, so sniffing the payload would guess.
 
@@ -117,6 +127,12 @@ The message that carries the prose arrives after the last tool call. `PostToolUs
 
 ```bash
 node tests/run.js
+```
+
+The Hermes plugin has its own suite:
+
+```bash
+python3 .hermes-plugin/test_plugin.py
 ```
 
 No network and no agent session. The suite writes synthetic transcript JSONL in both schemas, runs the hook as a subprocess, and asserts its output.
