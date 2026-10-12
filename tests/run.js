@@ -12,6 +12,7 @@ const os = require('os');
 const path = require('path');
 
 const HOOK = path.join(__dirname, '..', 'hooks', 'inject.js');
+const CHECK = path.join(__dirname, '..', 'hooks', 'check.js');
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'readable-responses-test-'));
 const EMPTY_HOME = fs.mkdtempSync(path.join(os.tmpdir(), 'readable-responses-home-'));
 const REAL_HOME = process.env.HOME;
@@ -30,6 +31,21 @@ function run(stdin, { home = EMPTY_HOME, projectDir = EMPTY_HOME, args = [] } = 
     encoding: 'utf8',
     env: { ...process.env, HOME: home, CLAUDE_PROJECT_DIR: projectDir },
   });
+}
+
+function runJson(stdin, { home = EMPTY_HOME, projectDir = EMPTY_HOME } = {}) {
+  return execFileSync('node', [CHECK, '--json'], {
+    input: stdin,
+    encoding: 'utf8',
+    env: { ...process.env, HOME: home, CLAUDE_PROJECT_DIR: projectDir },
+  });
+}
+
+function hermesHome(name, limits) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), `readable-responses-${name}-`));
+  fs.mkdirSync(path.join(dir, '.hermes'), { recursive: true });
+  fs.writeFileSync(path.join(dir, '.hermes', 'readable-responses.json'), JSON.stringify(limits));
+  return dir;
 }
 
 function codexInstall(codexHome) {
@@ -389,6 +405,54 @@ console.log('readable-responses');
   } else {
     console.log('  skip curt transcript reader (curt not installed)');
   }
+}
+
+{
+  const { DIRECTIVE, LIMITS, check, previousProse } = require('../hooks/check.js');
+  const out = JSON.parse(runJson(JSON.stringify({ assistant: WALL })));
+  assert('--json returns the directive', out.directive === DIRECTIVE, JSON.stringify(out));
+  assert('--json reports wall of text', out.findings.some(f => f.rule === 'wall of text'), JSON.stringify(out));
+  const file = transcript('jsonparity', turn('why is the bill high', WALL));
+  const expected = check(previousProse(file)).slice(0, LIMITS.maxReported);
+  assert(
+    '--json matches the transcript path',
+    JSON.stringify(out.findings) === JSON.stringify(expected),
+    `${JSON.stringify(out.findings)}\n${JSON.stringify(expected)}`
+  );
+}
+
+{
+  const out = JSON.parse(runJson(JSON.stringify({ assistant: CLEAN })));
+  assert('--json clean text has no findings', out.findings.length === 0, JSON.stringify(out));
+  const empty = JSON.parse(runJson(''));
+  assert('--json empty stdin gives the directive only', empty.findings.length === 0 && empty.directive.startsWith('READABLE RESPONSE GUIDANCE.'), JSON.stringify(empty));
+  const fenced = JSON.parse(runJson(JSON.stringify({ assistant: FENCED })));
+  assert('--json ignores code fences', fenced.findings.length === 0, JSON.stringify(fenced));
+}
+
+{
+  let status = 0;
+  try {
+    runJson('not json at all {{{');
+  } catch (error) {
+    status = error.status;
+  }
+  assert('--json malformed stdin exits 2', status === 2, String(status));
+}
+
+{
+  const home = hermesHome('hermeshome', { paragraphWords: 11 });
+  const out = JSON.parse(runJson(JSON.stringify({ assistant: CLEAN }), { home }));
+  assert('hermes config is read', out.directive.includes('paragraphs over 11 words'), out.directive);
+  fs.mkdirSync(path.join(home, '.claude'), { recursive: true });
+  fs.writeFileSync(path.join(home, '.claude', 'readable-responses.json'), JSON.stringify({ paragraphWords: 12 }));
+  const both = JSON.parse(runJson(JSON.stringify({ assistant: CLEAN }), { home }));
+  assert('hermes config beats claude config', both.directive.includes('paragraphs over 11 words'), both.directive);
+  const project = configDir('hermesproject', { projectConfig: { paragraphWords: 9 } });
+  const withProject = JSON.parse(runJson(JSON.stringify({ assistant: CLEAN }), { home, projectDir: project }));
+  assert('project config beats hermes config', withProject.directive.includes('paragraphs over 9 words'), withProject.directive);
+  fs.rmSync(home, { recursive: true, force: true });
+  fs.rmSync(project, { recursive: true, force: true });
 }
 
 fs.rmSync(TMP, { recursive: true, force: true });

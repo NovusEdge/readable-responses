@@ -19,6 +19,7 @@ function loadLimits() {
   const sources = [
     path.join(codexHome, 'readable-responses.json'),
     path.join(process.env.HOME || '', '.claude', 'readable-responses.json'),
+    path.join(process.env.HOME || '', '.hermes', 'readable-responses.json'),
     path.join(process.env.CLAUDE_PROJECT_DIR || process.cwd(), '.readable-responses.json'),
   ];
   const limits = { ...DEFAULTS };
@@ -57,6 +58,7 @@ function loadCurt() {
   const candidates = [
     path.join(process.env.HOME || '', '.claude/plugins/marketplaces/curt/hooks/check.js'),
     path.join(process.env.HOME || '', '.claude/plugins/marketplaces/anti-slop/hooks/check.js'),
+    path.join(process.env.HOME || '', '.hermes/plugins/curt/hooks/check.js'),
   ];
   for (const file of candidates) {
     if (!fs.existsSync(file)) continue;
@@ -289,3 +291,31 @@ function check(prose) {
 }
 
 module.exports = { LIMITS, DIRECTIVE, check, previousProse, loadCurt };
+
+// Hermes runs this file directly: {"assistant": text} on stdin, the guidance
+// and the findings for that text as one JSON line on stdout. Hermes hands over
+// message text, not a transcript, so previousProse's readers do not apply.
+if (require.main === module && process.argv.includes('--json')) {
+  let stdin = '';
+  process.stdin.setEncoding('utf8');
+  process.stdin.on('data', chunk => {
+    stdin += chunk;
+  });
+  process.stdin.on('end', () => {
+    let payload;
+    try {
+      payload = JSON.parse(stdin || '{}');
+    } catch {
+      process.exitCode = 2;
+      return;
+    }
+    const assistant = String((payload && payload.assistant) || '');
+    let findings = [];
+    if (assistant.trim()) {
+      const curt = loadCurt();
+      const prose = curt ? curt.prosify(assistant) : fallbackProsify(assistant);
+      findings = check(prose).slice(0, LIMITS.maxReported);
+    }
+    process.stdout.write(JSON.stringify({ directive: DIRECTIVE, findings }) + '\n');
+  });
+}
