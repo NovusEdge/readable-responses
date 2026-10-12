@@ -16,10 +16,12 @@ delete DEFAULTS._comment;
 function loadLimits() {
   const codexHome =
     process.env.CODEX_HOME || path.join(process.env.HOME || '', '.codex');
+  const hermesHome =
+    process.env.HERMES_HOME || path.join(process.env.HOME || '', '.hermes');
   const sources = [
     path.join(codexHome, 'readable-responses.json'),
     path.join(process.env.HOME || '', '.claude', 'readable-responses.json'),
-    path.join(process.env.HOME || '', '.hermes', 'readable-responses.json'),
+    path.join(hermesHome, 'readable-responses.json'),
     path.join(process.env.CLAUDE_PROJECT_DIR || process.cwd(), '.readable-responses.json'),
   ];
   const limits = { ...DEFAULTS };

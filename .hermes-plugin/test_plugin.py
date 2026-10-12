@@ -82,7 +82,7 @@ class HistoryTest(unittest.TestCase):
     def test_text_of_part_with_null_text(self):
         message = {"role": "assistant", "content": [
             {"type": "text", "text": None}, {"type": "text", "text": "ok"}]}
-        self.assertEqual(history.text_of(message), "\nok")
+        self.assertEqual(history.text_of(message), "ok")
 
     def test_text_of_tool_call_only_message(self):
         self.assertEqual(history.text_of(assistant(None, tool_calls=[{"id": "c"}])), "")

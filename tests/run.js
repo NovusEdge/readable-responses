@@ -22,6 +22,7 @@ const REAL_HOME = process.env.HOME;
 process.env.HOME = EMPTY_HOME;
 process.env.CLAUDE_PROJECT_DIR = EMPTY_HOME;
 process.env.CODEX_HOME = EMPTY_HOME;
+process.env.HERMES_HOME = EMPTY_HOME;
 
 let failures = 0;
 
@@ -33,11 +34,13 @@ function run(stdin, { home = EMPTY_HOME, projectDir = EMPTY_HOME, args = [] } = 
   });
 }
 
-function runJson(stdin, { home = EMPTY_HOME, projectDir = EMPTY_HOME } = {}) {
+// HERMES_HOME defaults to <home>/.hermes so cases that build a fake home keep
+// working while the ambient HERMES_HOME stays out of the way.
+function runJson(stdin, { home = EMPTY_HOME, projectDir = EMPTY_HOME, hermesDir = path.join(home, '.hermes') } = {}) {
   return execFileSync('node', [CHECK, '--json'], {
     input: stdin,
     encoding: 'utf8',
-    env: { ...process.env, HOME: home, CLAUDE_PROJECT_DIR: projectDir },
+    env: { ...process.env, HOME: home, CLAUDE_PROJECT_DIR: projectDir, HERMES_HOME: hermesDir },
   });
 }
 
@@ -453,6 +456,14 @@ console.log('readable-responses');
   assert('project config beats hermes config', withProject.directive.includes('paragraphs over 9 words'), withProject.directive);
   fs.rmSync(home, { recursive: true, force: true });
   fs.rmSync(project, { recursive: true, force: true });
+}
+
+{
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'readable-responses-hermeshomevar-'));
+  fs.writeFileSync(path.join(dir, 'readable-responses.json'), JSON.stringify({ paragraphWords: 13 }));
+  const out = JSON.parse(runJson(JSON.stringify({ assistant: CLEAN }), { hermesDir: dir }));
+  assert('HERMES_HOME config is read', out.directive.includes('paragraphs over 13 words'), out.directive);
+  fs.rmSync(dir, { recursive: true, force: true });
 }
 
 fs.rmSync(TMP, { recursive: true, force: true });

@@ -81,7 +81,7 @@ The bundled [de-slopify skill](skills/de-slopify/SKILL.md) adds guidance for tec
 | File | Scope |
 |------|-------|
 | `.readable-responses.json` in `CLAUDE_PROJECT_DIR`, or the current directory | this repository |
-| `~/.hermes/readable-responses.json` | Hermes user settings |
+| `$HERMES_HOME/readable-responses.json` (default `~/.hermes`) | Hermes user settings |
 | `~/.claude/readable-responses.json` | every project, Claude Code |
 | `CODEX_HOME/readable-responses.json` | Codex user settings |
 | `limits.json` in the plugin | the shipped defaults |
@@ -145,9 +145,11 @@ The Hermes plugin has its own suite:
 python3 .hermes-plugin/test_plugin.py
 ```
 
+It also needs no network or agent session: it runs node against the real `check.js` and loads the plugin the way Hermes does.
+
 ## Releases
 
-See [CHANGELOG.md](CHANGELOG.md). Tags and GitHub releases version the hook and bundled skill together.
+See [CHANGELOG.md](CHANGELOG.md). Tags and GitHub releases version the hook and bundled skill together. `.hermes-plugin/plugin.yaml` carries its own `version`, which must be bumped with each release alongside the CHANGELOG.
 
 ## License
 
