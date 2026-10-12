@@ -2,7 +2,7 @@
 
 Readability guidance and the `de-slopify` editing skill. The hook flags passages worth checking; the skill helps revise prose while preserving meaning, useful detail, and the author's voice.
 
-Works with Claude Code and Codex CLI.
+Works with Claude Code, Codex CLI, and Hermes Agent.
 
 ## Quickstart
 
@@ -40,11 +40,11 @@ The installer preserves every other hook in that file. Running it twice replaces
 hermes plugins install NovusEdge/readable-responses --enable
 ```
 
-The plugin runs `hooks/check.js` with `node`, from `PATH` or the copy Hermes installs in `~/.hermes/node`. Restart open Hermes sessions after installing.
+The plugin runs `hooks/check.js` with `node`, from `PATH` or the copy Hermes installs in `~/.hermes/node`. Restart open Hermes sessions after installing. Turn the plugin off with `hermes plugins disable readable-responses`.
 
 ## What it does
 
-A `UserPromptSubmit` hook reads the transcript, takes the last assistant turn, and strips code and quotes from it. It then measures six things:
+On Claude Code and Codex, a `UserPromptSubmit` hook reads the transcript. On Hermes, a `pre_llm_call` hook takes the previous reply from the conversation history and passes it to `check.js --json`. Either way the checker takes the last assistant turn, strips code and quotes from it, and measures six things:
 
 | Signal | Default threshold |
 |------|---------------|
@@ -109,13 +109,15 @@ The checker is shared. Only the edges differ:
 | hook output | raw stdout | `hookSpecificOutput.additionalContext` JSON | `{"context": …}` from Python |
 | previous reply | transcript `message.content[].text` | transcript `payload.content[].output_text` | `conversation_history`, passed to `check.js --json` |
 
-`hooks/inject.js` takes `--codex` to switch the output format. The flag is explicit because the two hosts send overlapping stdin fields, so sniffing the payload would guess.
+`hooks/inject.js` takes `--codex` to switch the output format. The flag is explicit because the two hosts send overlapping stdin fields, so sniffing the payload would guess. The Hermes plugin does not use `inject.js`. It calls `check.js --json` from `.hermes-plugin/`.
 
 ## It composes with curt
 
 The detector checks shape. [Curt](https://github.com/NovusEdge/curt) supplies additional prose and code lint signals; Readable Responses does not duplicate its word patterns. Both tools give contextual guidance rather than treating a lint match as proof of bad writing.
 
 Run both. When curt is installed, this plugin reuses its `lastTurn` and `prosify` exports instead of parsing the transcript itself. Curt reads the Claude Code schema only, so a Codex rollout falls through to the built-in reader.
+
+On Hermes, `check.js --json` receives message text, so curt's transcript reader is never used. If curt is installed under `~/.claude/plugins/marketplaces/curt` or `~/.hermes/plugins/curt`, the `--json` path reuses its `prosify` export.
 
 ## Why no PostToolUse tier
 
@@ -129,12 +131,6 @@ The message that carries the prose arrives after the last tool call. `PostToolUs
 node tests/run.js
 ```
 
-The Hermes plugin has its own suite:
-
-```bash
-python3 .hermes-plugin/test_plugin.py
-```
-
 No network and no agent session. The suite writes synthetic transcript JSONL in both schemas, runs the hook as a subprocess, and asserts its output.
 
 It covers the detectors, advisory output, config precedence, the `--codex` envelope, repeated installation, bundled skill discovery, and preservation of personal skills and other hooks.
@@ -142,6 +138,12 @@ It covers the detectors, advisory output, config precedence, the `--codex` envel
 The failure cases are a missing `transcript_path`, malformed stdin, a malformed config file, and a message that is all code fences.
 
 `HOME` points at an empty directory for most cases, which forces the built-in transcript reader. One case runs against the real `HOME` and skips when curt is absent.
+
+The Hermes plugin has its own suite:
+
+```bash
+python3 .hermes-plugin/test_plugin.py
+```
 
 ## Releases
 
