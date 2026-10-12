@@ -63,7 +63,8 @@ class IsolatedHome(unittest.TestCase):
     def setUp(self):
         self.home = tempfile.mkdtemp(prefix="rr-hermes-home-")
         patcher = mock.patch.dict(os.environ, {
-            "HOME": self.home, "CLAUDE_PROJECT_DIR": self.home, "CODEX_HOME": self.home})
+            "HOME": self.home, "CLAUDE_PROJECT_DIR": self.home, "CODEX_HOME": self.home,
+            "HERMES_HOME": os.path.join(self.home, ".hermes")})
         patcher.start()
         self.addCleanup(patcher.stop)
         self.addCleanup(shutil.rmtree, self.home, True)

@@ -441,6 +441,22 @@ console.log('readable-responses');
     status = error.status;
   }
   assert('--json malformed stdin exits 2', status === 2, String(status));
+  for (const bad of ['null', '[]', '42', JSON.stringify({ assistant: 7 })]) {
+    let code = 0;
+    try {
+      runJson(bad);
+    } catch (error) {
+      code = error.status;
+    }
+    assert(`--json rejects ${bad} with exit 2`, code === 2, String(code));
+  }
+}
+
+{
+  const home = hermesHome('nullcfg', null);
+  const out = JSON.parse(runJson(JSON.stringify({ assistant: CLEAN }), { home }));
+  assert('a null limits file falls back to the defaults', out.directive.includes('paragraphs over 70 words'), out.directive);
+  fs.rmSync(home, { recursive: true, force: true });
 }
 
 {

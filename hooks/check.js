@@ -32,6 +32,8 @@ function loadLimits() {
     } catch {
       continue;
     }
+    // Valid JSON can still be null, an array or a scalar; reading keys off null throws.
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) continue;
     for (const key of Object.keys(DEFAULTS)) {
       if (typeof parsed[key] === 'number') limits[key] = parsed[key];
     }
@@ -311,7 +313,14 @@ if (require.main === module && process.argv.includes('--json')) {
       process.exitCode = 2;
       return;
     }
-    const assistant = String((payload && payload.assistant) || '');
+    const valid =
+      payload && typeof payload === 'object' && !Array.isArray(payload) &&
+      (payload.assistant === undefined || typeof payload.assistant === 'string');
+    if (!valid) {
+      process.exitCode = 2;
+      return;
+    }
+    const assistant = payload.assistant || '';
     let findings = [];
     if (assistant.trim()) {
       const curt = loadCurt();
