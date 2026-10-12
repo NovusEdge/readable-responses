@@ -1,5 +1,5 @@
 name: readable-responses
-version: 0.4.0
+version: 0.5.0
 description: Readable response guidance and a readability review of the previous reply
 author: NovusEdge
 provides_hooks:

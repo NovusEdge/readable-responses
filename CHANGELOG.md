@@ -1,12 +1,20 @@
 # Changelog
 
-## [Unreleased]
+## [0.5.0] - 2026-10-12
 
 ### Added
 
-- Hermes Agent plugin in `.hermes-plugin/`: per-prompt guidance and the previous-reply review through `pre_llm_call`.
+- Hermes Agent plugin in `.hermes-plugin/`: per-prompt guidance and the previous-reply review through `pre_llm_call`. Install it with `hermes plugins install NovusEdge/readable-responses --enable`.
 - `node hooks/check.js --json` for hosts that pass message text instead of a transcript.
 - `$HERMES_HOME/readable-responses.json` (default `~/.hermes`) as a limits source.
+
+### Changed
+
+- The guidance asks for connected prose in short answers, and scannable structure past about 150 words and in documents.
+
+### Fixed
+
+- A limits file holding valid JSON that is not an object, such as `null`, no longer breaks the hook; it is skipped.
 
 ## [0.4.0] - 2026-10-09
 
