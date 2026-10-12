@@ -155,5 +155,66 @@ class NodeRunnerTest(IsolatedHome):
         self.assertIsNone(node_runner.run_json(failing, {}))
 
 
+class FakeCtx:
+    def __init__(self):
+        self.hooks = {}
+
+    def register_hook(self, name, callback):
+        self.hooks[name] = callback
+
+
+class HookTest(IsolatedHome):
+    def setUp(self):
+        super().setUp()
+        PLUGIN._last_directive = ""
+
+    def context(self, messages):
+        result = PLUGIN.pre_llm_call(conversation_history=messages, session_id="s1")
+        return result["context"] if result else None
+
+    def test_register_wires_pre_llm_call(self):
+        ctx = FakeCtx()
+        PLUGIN.register(ctx)
+        self.assertIs(ctx.hooks["pre_llm_call"], PLUGIN.pre_llm_call)
+
+    def test_first_turn_gets_the_directive_only(self):
+        text = self.context([user("hello")])
+        self.assertTrue(text.startswith("READABLE RESPONSE GUIDANCE."))
+        self.assertNotIn("READABILITY REVIEW", text)
+
+    def test_long_paragraph_is_reviewed(self):
+        text = self.context([user("why is the bill high"), assistant(WALL), user("ok")])
+        self.assertIn("READABILITY REVIEW for your previous message:", text)
+        self.assertIn("wall of text", text)
+        self.assertIn('"The deployment pipeline currently', text)
+        self.assertIn("Inspect these passages in context.", text)
+
+    def test_clean_reply_is_not_reviewed(self):
+        text = self.context([user("why"), assistant(CLEAN), user("ok")])
+        self.assertTrue(text.startswith("READABLE RESPONSE GUIDANCE."))
+        self.assertNotIn("READABILITY REVIEW", text)
+
+    def test_part_list_reply_is_reviewed(self):
+        reply = {"role": "assistant", "content": [{"type": "text", "text": WALL}]}
+        self.assertIn("wall of text", self.context([user("why"), reply, user("ok")]))
+
+    def test_node_missing_returns_none_before_any_directive(self):
+        with mock.patch.object(node_runner, "find_node", return_value=None), \
+                mock.patch.object(node_runner, "_warned_missing", False), \
+                self.assertLogs(node_runner.logger, "WARNING"):
+            self.assertIsNone(PLUGIN.pre_llm_call(conversation_history=[user("hi")]))
+
+    def test_node_failure_falls_back_to_last_directive(self):
+        first = self.context([user("hi")])
+        with mock.patch.object(node_runner, "run_json", return_value=None):
+            again = self.context([user("why"), assistant(WALL), user("ok")])
+        self.assertEqual(again, first)
+
+    def test_non_dict_result_falls_back_to_last_directive(self):
+        first = self.context([user("hi")])
+        with mock.patch.object(node_runner, "run_json", return_value=["unexpected"]):
+            self.assertEqual(self.context([user("hi")]), first)
+
+
 if __name__ == "__main__":
     unittest.main()

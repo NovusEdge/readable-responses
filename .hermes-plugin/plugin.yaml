@@ -1,0 +1,6 @@
+name: readable-responses
+version: 0.3.0
+description: Readable response guidance and a readability review of the previous reply
+author: NovusEdge
+provides_hooks:
+  - pre_llm_call
