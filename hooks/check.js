@@ -16,9 +16,12 @@ delete DEFAULTS._comment;
 function loadLimits() {
   const codexHome =
     process.env.CODEX_HOME || path.join(process.env.HOME || '', '.codex');
+  const hermesHome =
+    process.env.HERMES_HOME || path.join(process.env.HOME || '', '.hermes');
   const sources = [
     path.join(codexHome, 'readable-responses.json'),
     path.join(process.env.HOME || '', '.claude', 'readable-responses.json'),
+    path.join(hermesHome, 'readable-responses.json'),
     path.join(process.env.CLAUDE_PROJECT_DIR || process.cwd(), '.readable-responses.json'),
   ];
   const limits = { ...DEFAULTS };
@@ -29,6 +32,8 @@ function loadLimits() {
     } catch {
       continue;
     }
+    // Valid JSON can still be null, an array or a scalar; reading keys off null throws.
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) continue;
     for (const key of Object.keys(DEFAULTS)) {
       if (typeof parsed[key] === 'number') limits[key] = parsed[key];
     }
@@ -43,8 +48,8 @@ const LIMITS = loadLimits();
 const DIRECTIVE = [
   'READABLE RESPONSE GUIDANCE. Follow the user\'s requested format and level of detail.',
   '- Lead with the answer when it is known. A progress update can state the next action; do not invent a finding.',
-  '- Write connected prose with concrete facts and enough explanation for this reader. Keep necessary conditions and uncertainty.',
-  '- Use lists for parallel items or steps, and tables when shared fields help a comparison. Neither is required by the number of items.',
+  '- Give concrete facts and enough explanation for this reader. Keep necessary conditions and uncertainty.',
+  '- Short answers are connected prose. A reply past about 150 words, or any document, gets scannable structure: one idea per paragraph, headers for sections, lists for parallel items or steps, tables when shared fields help a comparison.',
   '- When editing, preserve the author\'s meaning, examples, opinions, jokes, and rhythm. Do not manufacture a voice with slang or clipped fragments.',
   '- Remove empty promotion, staged revelations, honesty narration, and repeated conclusions while keeping substantive corrections and evidence.',
   `- Review signals: paragraphs over ${LIMITS.paragraphWords} words, sentences over ${LIMITS.sentenceWords} words, and blocks over ${LIMITS.blockLines} lines. These are prompts to inspect context, not output limits.`,
@@ -57,6 +62,7 @@ function loadCurt() {
   const candidates = [
     path.join(process.env.HOME || '', '.claude/plugins/marketplaces/curt/hooks/check.js'),
     path.join(process.env.HOME || '', '.claude/plugins/marketplaces/anti-slop/hooks/check.js'),
+    path.join(process.env.HOME || '', '.hermes/plugins/curt/hooks/check.js'),
   ];
   for (const file of candidates) {
     if (!fs.existsSync(file)) continue;
@@ -289,3 +295,38 @@ function check(prose) {
 }
 
 module.exports = { LIMITS, DIRECTIVE, check, previousProse, loadCurt };
+
+// Hermes runs this file directly: {"assistant": text} on stdin, the guidance
+// and the findings for that text as one JSON line on stdout. Hermes hands over
+// message text, not a transcript, so previousProse's readers do not apply.
+if (require.main === module && process.argv.includes('--json')) {
+  let stdin = '';
+  process.stdin.setEncoding('utf8');
+  process.stdin.on('data', chunk => {
+    stdin += chunk;
+  });
+  process.stdin.on('end', () => {
+    let payload;
+    try {
+      payload = JSON.parse(stdin || '{}');
+    } catch {
+      process.exitCode = 2;
+      return;
+    }
+    const valid =
+      payload && typeof payload === 'object' && !Array.isArray(payload) &&
+      (payload.assistant === undefined || typeof payload.assistant === 'string');
+    if (!valid) {
+      process.exitCode = 2;
+      return;
+    }
+    const assistant = payload.assistant || '';
+    let findings = [];
+    if (assistant.trim()) {
+      const curt = loadCurt();
+      const prose = curt ? curt.prosify(assistant) : fallbackProsify(assistant);
+      findings = check(prose).slice(0, LIMITS.maxReported);
+    }
+    process.stdout.write(JSON.stringify({ directive: DIRECTIVE, findings }) + '\n');
+  });
+}

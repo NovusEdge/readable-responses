@@ -1,5 +1,5 @@
 {
-  "_comment": "Review thresholds, not mandatory output limits. Override them in .readable-responses.json in the project, ~/.claude/readable-responses.json, or CODEX_HOME/readable-responses.json. Installed plugin updates replace this file; the injected guidance quotes the resolved numbers.",
+  "_comment": "Review thresholds, not mandatory output limits. Override them in .readable-responses.json in the project, $HERMES_HOME/readable-responses.json (default ~/.hermes),~/.claude/readable-responses.json, or CODEX_HOME/readable-responses.json. Installed plugin updates replace this file; the injected guidance quotes the resolved numbers.",
   "paragraphWords": 70,
   "sentenceWords": 35,
   "blockLines": 6,

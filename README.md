@@ -2,7 +2,7 @@
 
 Readability guidance and the `de-slopify` editing skill. The hook flags passages worth checking; the skill helps revise prose while preserving meaning, useful detail, and the author's voice.
 
-Works with Claude Code and Codex CLI.
+Works with Claude Code, Codex CLI, and Hermes Agent.
 
 ## Quickstart
 
@@ -65,9 +65,17 @@ The installer preserves every other hook in that file. Running it twice replaces
 
 `install.py` needs Python 3 and the standard library only. The hook itself runs on Node.
 
+### Hermes Agent
+
+```bash
+hermes plugins install NovusEdge/readable-responses --enable
+```
+
+The plugin runs `hooks/check.js` with `node`, from `PATH` or the copy Hermes installs in `~/.hermes/node`. Restart open Hermes sessions after installing. Turn the plugin off with `hermes plugins disable readable-responses`.
+
 ## What it does
 
-A `UserPromptSubmit` hook reads the transcript, takes the last assistant turn, and strips code and quotes from it. It then measures six things:
+On Claude Code and Codex, a `UserPromptSubmit` hook reads the transcript. On Hermes, a `pre_llm_call` hook takes the previous reply from the conversation history and passes it to `check.js --json`. Either way the checker takes the last assistant turn, strips code and quotes from it, and measures six things:
 
 | Signal | Default threshold |
 |------|---------------|
@@ -91,7 +99,7 @@ The accompanying guidance asks the agent to inspect the passage in context and c
 
 ## Writing guidance and de-slopify
 
-Lead with the answer when it is known; a progress update can state the next action. Write connected prose with enough explanation for the reader. Use lists for parallel items or steps, and tables when shared fields help a comparison. Neither is required by the number of items.
+Lead with the answer when it is known; a progress update can state the next action. Short answers are connected prose. A reply past about 150 words, or any document, gets scannable structure: one idea per paragraph, headers for sections, lists for parallel items or steps, and tables when shared fields help a comparison.
 
 When editing, preserve facts, qualifications, examples, opinions, jokes, and rhythm. Remove empty promotion, staged revelations, honesty narration, and repeated conclusions while keeping real corrections and the evidence behind them. Do not invent experiences or stronger claims to make text sound more natural.
 
@@ -104,11 +112,12 @@ The bundled [de-slopify skill](skills/de-slopify/SKILL.md) adds guidance for tec
 | File | Scope |
 |------|-------|
 | `.readable-responses.json` in `CLAUDE_PROJECT_DIR`, or the current directory | this repository |
+| `$HERMES_HOME/readable-responses.json` (default `~/.hermes`) | Hermes user settings |
 | `~/.claude/readable-responses.json` | every project, Claude Code |
 | `CODEX_HOME/readable-responses.json` | Codex user settings |
 | `limits.json` in the plugin | the shipped defaults |
 
-The project file wins, followed by Claude user settings, Codex user settings, and the defaults. A file may set one key and inherit the rest:
+The project file wins, followed by Hermes user settings, Claude user settings, Codex user settings, and the defaults. A file may set one key and inherit the rest:
 
 ```json
 { "paragraphWords": 50 }
@@ -120,23 +129,26 @@ Editing `limits.json` in an installed plugin does not survive an update, because
 
 The injected guidance quotes the resolved numbers used by the checker. Changing a threshold changes when a passage is flagged; it does not set a mandatory length for future replies.
 
-## How the two hosts differ
+## How the hosts differ
 
 The checker is shared. Only the edges differ:
 
-| | Claude Code | Codex CLI |
-|---|---|---|
-| config | plugin `hooks.json` | `~/.codex/hooks.json` |
-| hook output | raw stdout | `hookSpecificOutput.additionalContext` JSON |
-| transcript entry | `message.content[].text` | `payload.content[].output_text` |
+| | Claude Code | Codex CLI | Hermes Agent |
+|---|---|---|---|
+| config | plugin `hooks.json` | `~/.codex/hooks.json` | `.hermes-plugin/plugin.yaml` |
+| hook | `UserPromptSubmit` | `UserPromptSubmit` | `pre_llm_call` |
+| hook output | raw stdout | `hookSpecificOutput.additionalContext` JSON | `{"context": …}` from Python |
+| previous reply | transcript `message.content[].text` | transcript `payload.content[].output_text` | `conversation_history`, passed to `check.js --json` |
 
-`hooks/inject.js` takes `--codex` to switch the output format. The flag is explicit because the two hosts send overlapping stdin fields, so sniffing the payload would guess.
+`hooks/inject.js` takes `--codex` to switch the output format. The flag is explicit because the two hosts send overlapping stdin fields, so sniffing the payload would guess. The Hermes plugin does not use `inject.js`. It calls `check.js --json` from `.hermes-plugin/`.
 
 ## It composes with curt
 
 The detector checks shape. [Curt](https://github.com/NovusEdge/curt) supplies additional prose and code lint signals; Readable Responses does not duplicate its word patterns. Both tools give contextual guidance rather than treating a lint match as proof of bad writing.
 
 Run both. When curt is installed, this plugin reuses its `lastTurn` and `prosify` exports instead of parsing the transcript itself. Curt reads the Claude Code schema only, so a Codex rollout falls through to the built-in reader.
+
+On Hermes, `check.js --json` receives message text, so curt's transcript reader is never used. If curt is installed under `~/.claude/plugins/marketplaces/curt` or `~/.hermes/plugins/curt`, the `--json` path reuses its `prosify` export.
 
 ## Why no PostToolUse tier
 
@@ -158,9 +170,17 @@ The failure cases are a missing `transcript_path`, malformed stdin, a malformed 
 
 `HOME` points at an empty directory for most cases, which forces the built-in transcript reader. One case runs against the real `HOME` and skips when curt is absent.
 
+The Hermes plugin has its own suite:
+
+```bash
+python3 .hermes-plugin/test_plugin.py
+```
+
+It also needs no network or agent session: it runs node against the real `check.js` and loads the plugin the way Hermes does.
+
 ## Releases
 
-See [CHANGELOG.md](CHANGELOG.md). Tags and GitHub releases version the hook and bundled skill together.
+See [CHANGELOG.md](CHANGELOG.md). Tags and GitHub releases version the hook and bundled skill together. `.hermes-plugin/plugin.yaml` carries its own `version`, which must be bumped with each release alongside the CHANGELOG.
 
 ## License
 
