@@ -79,6 +79,11 @@ class HistoryTest(unittest.TestCase):
             {"type": "text", "text": "two"}]}
         self.assertEqual(history.text_of(message), "one\ntwo")
 
+    def test_text_of_part_with_null_text(self):
+        message = {"role": "assistant", "content": [
+            {"type": "text", "text": None}, {"type": "text", "text": "ok"}]}
+        self.assertEqual(history.text_of(message), "\nok")
+
     def test_text_of_tool_call_only_message(self):
         self.assertEqual(history.text_of(assistant(None, tool_calls=[{"id": "c"}])), "")
 
@@ -112,8 +117,26 @@ class NodeRunnerTest(IsolatedHome):
         self.assertTrue(any(f["rule"] == "wall of text" for f in out["findings"]))
 
     def test_missing_node_returns_none(self):
-        with mock.patch.object(node_runner, "find_node", return_value=None):
+        with mock.patch.object(node_runner, "find_node", return_value=None), \
+                mock.patch.object(node_runner, "_warned_missing", False), \
+                self.assertLogs(node_runner.logger, "WARNING"):
             self.assertIsNone(node_runner.run_json(self.CHECK, {"assistant": WALL}))
+
+    def test_unresolvable_home_returns_none(self):
+        env = {k: v for k, v in os.environ.items() if k != "HERMES_HOME"}
+        with mock.patch.dict(os.environ, env, clear=True), \
+                mock.patch("shutil.which", return_value=None), \
+                mock.patch.object(Path, "home", side_effect=RuntimeError("no home")), \
+                mock.patch.object(node_runner, "_warned_missing", True):
+            self.assertIsNone(node_runner.run_json(self.CHECK, {}))
+
+    def test_unserializable_payload_returns_none(self):
+        self.assertIsNone(node_runner.run_json(self.CHECK, {"assistant": object()}))
+
+    def test_invalid_utf8_stdout_returns_none(self):
+        bad = Path(self.home) / "bad.js"
+        bad.write_text("process.stdout.write(Buffer.from([0xff, 0xfe]));")
+        self.assertIsNone(node_runner.run_json(bad, {}))
 
     def test_timeout_returns_none(self):
         slow = Path(self.home) / "slow.js"
